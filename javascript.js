@@ -156,10 +156,12 @@ function displayResults(data) {
     const resultsDiv = document.getElementById('results');
     resultsDiv.innerHTML = `
         <h2>Results</h2>
+        <div class="calc" style="font-weight: bolder; display: flex; flex-direction: row; padding: 15px; font-size:18px;">
         <p>No. of Borrowed Bits: ${data.borrowedBits}</p>
         <p>No. of Subnets: ${data.numSubnets}</p>
         <p>Subnet Mask: /${data.subnetMask}</p>
-        <h3>All Subnets</h3>
+        </div>
+        <h3 style="font-weight: 20px">All Subnets</h3>
         <table>
             <thead>
                 <tr>
