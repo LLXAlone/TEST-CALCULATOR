@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subnet Calculator</title>
+</head>
+<body>
+    <h1>Subnet Calculator</h1>
+    <form id="subnetForm">
+        <label for="ipAddress">Enter IP address:</label>
+        <input type="text" id="ipAddress" name="ipAddress"><br><br>
+        
+        <label for="Count">Enter:</label>
+        <input type="text" id="Count" name="Count"><br><br>
+        
+        <div class="radio-container">
+            <label>
+                <input type="radio" name="option" value="byHosts" checked>
+                By Hosts
+            </label>
+            <label>
+                <input type="radio" name="option" value="bySubnets">
+                By Subnets
+            </label>
+        </div>
+
+        <button type="button" onclick="calculate()">Calculate</button>
+    </form>
+    <div id="result"></div> 
+
+    <script>
+        let subBits, submask; //Global
+
+        function isValidIpAddress(ipAddress) {
+            // Regular expression to match IP address pattern
+            const ipPattern = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            return ipPattern.test(ipAddress);
+        }
+        function toInt(ipAddress) {
+            return ipAddress.split('.').map(part => parseInt(part));
+        }
+
+        function toBinary(newSubnet) {
+            const octets = newSubnet.split('.');
+            const binaryOctets = octets.map(octet => parseInt(octet).toString(2).padStart(8, '0'));
+            const binary = binaryOctets.join('.');
+            return binary;
+        }
+        
+        function toCidr(binary) {
+            const cidrLength = binary.split('').filter(bit => bit === '1').length;
+            return cidrLength;
+        }
+
+        function determineNetworkClass(ipAddress) {
+            const firstOctet = parseInt(ipAddress.split('.')[0]);
+            if (firstOctet >= 1 && firstOctet <= 127) {
+                return 'A';
+            } else if (firstOctet >= 128 && firstOctet <= 191) {
+                return 'B';
+            } else if (firstOctet >= 192 && firstOctet <= 223) {
+                return 'C';
+            } else {
+                return 'Unknown';
+            }
+            
+        }
+
+        function determineSubnetMask(networkClass) {
+            if (networkClass === 'A') {
+                return "255.0.0.0";
+            } else if (networkClass === 'B') {
+                return "255.255.0.0";
+            } else if (networkClass === 'C') {
+                return "255.255.255.0";
+            } else {
+                return "Out of range Subnet Mask"; // Default subnet mask for unknown network classes
+            }
+        }
+
+        function subnetPerHostCount(Count, networkClass) {
+            let hostBits;
+            try {
+                hostBits = Math.ceil(Math.log2(Count + 2));
+            } catch (error) {
+                alert("Please enter a positive integer only");
+                return null;
+            }
+
+            switch (networkClass) {
+                case 'A':
+                    subBits = (8 - hostBits) + 16;
+                    break;
+                case 'B':
+                    subBits = (8 - hostBits) + 8;
+                    break;
+                case 'C':
+                    subBits = (8 - hostBits);
+                    break;
+                default:
+                    return "Invalid Network Class";
+            }
+
+            const numSubnet = 2 ** subBits;
+            console.log("Number of borrowed bits: ", subBits);
+            return numSubnet;
+        }
+
+        function HostPerSubnet(Count, networkClass) {
+            let hostBits;
+
+            try {
+                subBits = Math.ceil(Math.log2(Count));
+            } catch (error) {
+                alert("Please enter a positive integer only");
+                return null;
+            }
+
+            switch (networkClass) {
+                case 'A':
+                    hostBits = 32 - subBits;
+                    break;
+                case 'B':
+                    hostBits = 16 - subBits;
+                    break;
+                default:
+                    hostBits = 8 - subBits;
+            }
+
+            const hostcount = (2 ** hostBits) - 2   ;
+
+            console.log("Borrowed bits: ", subBits);
+
+            return hostcount;
+        }
+
+        function determineNewSubnet(subnetMask, networkClass) {
+            submask = toInt(subnetMask);
+
+            switch (networkClass) {
+                case 'C':
+                    submask[3] = 256 - Math.pow(2, 8-subBits);
+                    break;
+                case 'B':
+                    submask[2] = 256 - Math.pow(2, 8-subBits);
+                    break;
+                default:
+                    submask[1] = 256 - Math.pow(2, 8-subBits);
+            }
+
+            let smask = submask.join('.');
+            console.log(smask);
+            return smask;
+        }
+
+        function networkAddress(ipAddress, networkClass, numSubnet) {
+            let ipa = toInt(ipAddress);
+            const subnets = [];
+            let multiplier, networkAddress, startHost, endHost, broadcastAddress;
+
+            switch (networkClass) {
+                case 'C':
+                    multiplier = 256 - submask[3];
+                    console.log("Increment: ", multiplier);
+                    for (let x = 0; x < numSubnet; x++) {
+                        if (ipa[3] > 255) {
+                            ipa[3] -= 256;
+                        }
+                        networkAddress = `${ipa[0]}.${ipa[1]}.${ipa[2]}.${ipa[3]}`;
+                        ipa[3]++;
+                        if (ipa[3] > 255) {
+                            ipa[3] -= 256;
+                        }
+                        startHost = `${ipa[0]}.${ipa[1]}.${ipa[2]}.${ipa[3]}`;
+                        ipa[3] += multiplier - 3;
+                        if (ipa[3] > 255) {
+                            ipa[3] -= 256;
+                        }
+                        endHost = `${ipa[0]}.${ipa[1]}.${ipa[2]}.${ipa[3]}`;
+                        ipa[3]++;
+                        if (ipa[3] > 255) {
+                            ipa[3] -= 256;
+                        }
+                        broadcastAddress = `${ipa[0]}.${ipa[1]}.${ipa[2]}.${ipa[3]}`;
+                        console.log("Subnet: ", x);
+                        console.log("Network Address:", networkAddress);
+                        console.log("Range of Host Addresses:", startHost, "-", endHost);
+                        console.log("Broadcast Address:", broadcastAddress);
+                        console.log();
+                        ipa[3]++;
+                        subnets.push({
+                            networkAddress,
+                            useableRange: `${startHost} - ${endHost}`,
+                            broadcastAddress
+                        });
+                    }
+                    break;
+                case 'B':
+                    multiplier = 256 - submask[2];
+                    console.log("Increment: ", multiplier);
+                    for (let x = 0; x < numSubnet; x++) {
+                        if (ipa[2] > 255) {
+                            ipa[2] -= 256;
+                        }
+                        networkAddress = `${ipa[0]}.${ipa[1]}.${ipa[2]}.0`;
+                        ipa[2]++;
+                        if (ipa[2] > 255) {
+                            ipa[2] -= 256;
+                        }
+                        startHost = `${ipa[0]}.${ipa[1]}.${ipa[2]}.1`;
+                        ipa[2] += multiplier - 1;
+                        if (ipa[2] > 255) {
+                            ipa[2] -= 256;
+                        }
+                        endHost = `${ipa[0]}.${ipa[1]}.${ipa[2]}.254`;
+                        if (ipa[2] > 255) {
+                            ipa[2] -= 256;
+                        }
+                        broadcastAddress = `${ipa[0]}.${ipa[1]}.${ipa[2]}.255`;
+                        console.log("Subnet: ", x);
+                        console.log("Network Address:", networkAddress);
+                        console.log("Range of Host Addresses:", startHost, "-", endHost);
+                        console.log("Broadcast Address:", broadcastAddress);
+                        console.log();
+                        ipa[2]++;
+                        subnets.push({
+                            networkAddress,
+                            useableRange: `${startHost} - ${endHost}`,
+                            broadcastAddress
+                        });
+                    }
+                    break;
+                case 'A':
+                    multiplier = 256 - submask[1];
+                    console.log("Increment: ", multiplier);
+                    for (let x = 0; x < numSubnet; x++) {
+                        if (ipa[1] > 255) {
+                            ipa[1] -= 256;
+                        }
+                        networkAddress = `${ipa[0]}.${ipa[1]}.0.0`;
+                        ipa[1]++;
+                        if (ipa[1] > 255) {
+                            ipa[1] -= 256;
+                        }
+                        startHost = `${ipa[0]}.${ipa[1]}.0.1`;
+                        ipa[1] += multiplier - 1;
+                        if (ipa[1] > 255) {
+                            ipa[1] -= 256;
+                        }
+                        endHost = `${ipa[0]}.${ipa[1]}.255.254`;
+                        if (ipa[1] > 255) {
+                            ipa[1] -= 256;
+                        }
+                            broadcastAddress = `${ipa[0]}.${ipa[1]}.255.255`;
+                        console.log("Subnet: ", x);
+                        console.log("Network Address:", networkAddress);
+                        console.log("Range of Host Addresses:", startHost, "-", endHost);
+                        console.log("Broadcast Address:", broadcastAddress);
+                        console.log();
+                        ipa[1]++;
+                        subnets.push({
+                            networkAddress,
+                            useableRange: `${startHost} - ${endHost}`,
+                            broadcastAddress
+                        });
+                    }
+                    break;
+            }
+            return subnets;
+        }
+
+        function calculate() {
+            let selectedOption = document.querySelector('input[name="option"]:checked').value;
+
+            const ipAddress = document.getElementById('ipAddress').value.trim();
+            const Count = parseInt(document.getElementById('Count').value.trim());
+
+            if (isNaN(Count) || Count <= 0) {
+                alert("Please enter a positive integer only for Count.");
+                return;
+            }
+            
+            if (!isValidIpAddress(ipAddress)) {
+            document.getElementById('result').textContent = "Invalid IP address.";
+            return;
+            }
+
+
+            const networkClass = determineNetworkClass(ipAddress);
+            console.log("Network Class:", networkClass);
+
+            const subnetMask = determineSubnetMask(networkClass);
+            console.log("Subnet Mask is: ", subnetMask);
+
+            if (selectedOption === "byHosts") {
+                const numSubnets = subnetPerHostCount(Count, networkClass);
+                if (networkClass === 'C'){
+                    if (Count >254 || Count < 1){
+                        alert("Maxhost for this class of subnet!")
+                    }
+                } else if (networkClass === 'B') {
+                    if (Count >65534 || Count <255) {
+                        alert("Maxhost for this class of subnet!") 
+                    }
+                } else {
+                    if (Count >16777214 || Count < 65535)
+                        alert("Maxhost for this class of subnet!")
+                }
+                if (numSubnets !== null) {
+                    console.log("Number of Subnets: ", numSubnets);
+                    
+                    const newSubnet = determineNewSubnet(subnetMask, networkClass);
+                    console.log("Subnet Mask: ", newSubnet, "\nSubnet Mask in Binary: ", toBinary(newSubnet));
+                    
+                    const binarySubnet = toBinary(newSubnet);
+                    const cidrLength = toCidr(binarySubnet);
+                    const subnets = networkAddress(ipAddress, networkClass, numSubnets);
+                    
+                    // Displaying results in the HTML
+                    display({
+                        networkClass: networkClass,
+                        subnetMask: subnetMask,
+                        numSubnets: numSubnets,
+                        hostcount: null, // Since you're not calculating this in this branch
+                        toBinary: binarySubnet,
+                        cidrLength: cidrLength,
+                        subnets: subnets
+                    });
+                }
+            
+            } else if (selectedOption === "bySubnets") {
+                const hostcount = HostPerSubnet(Count, networkClass);
+                if (hostcount !== null) {
+                    console.log("Number of Host: ", hostcount);
+                    
+                    const newSubnet = determineNewSubnet(subnetMask, networkClass);
+                    console.log("Subnet Mask: ", newSubnet, "\nSubnet Mask in Binary: ", toBinary(newSubnet));
+                    
+                    const binarySubnet = toBinary(newSubnet);
+                    const cidrLength = toCidr(binarySubnet);
+                    const subnets = networkAddress(ipAddress, networkClass, subnetPerHostCount(hostcount, networkClass));
+                    
+                    // Displaying results in the HTML
+                    display({
+                        networkClass: networkClass,
+                        subnetMask: subnetMask,
+                        numSubnets: null, // Since you're not calculating this in this branch
+                        hostcount: hostcount,
+                        toBinary: binarySubnet,
+                        cidrLength: cidrLength,
+                        subnets: subnets
+                    });
+
+                }
+            }
+
+
+        }
+        function display(data) {
+            const resultDiv = document.getElementById('result');
+            let html = ''
+            // Displaying network class, subnet mask, etc.
+            if (!Array.isArray(data.subnets)) {
+                html += `
+                    <p>Network Class: ${data.networkClass}</p>
+                    <p>Subnet Mask: ${data.subnetMask}</p>
+                    <p>Number of Subnets: ${data.numSubnets || '-'}</p>
+                    <p>Subnet Mask in Binary: ${data.toBinary}</p>
+                    <p>CIDR Form: ${data.cidrLength}</p>
+                `;
+            } else {
+                html += `
+                    <p>Network Class: ${data.networkClass}</p>
+                    <p>Subnet Mask: ${data.subnetMask}</p>      
+                    <p>Number of Host: ${data.hostcount || '-'}</p>
+                    <p>Subnet Mask in Binary: ${data.toBinary}</p>
+                    <p>CIDR Form: ${data.cidrLength}</p>
+                `;
+            
+                html += `
+                    <h3>All Subnets</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Subnet #</th>
+                                <th>Network Address</th>
+                                <th>Range of Useable Host Addresses</th>
+                                <th>Broadcast Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.subnets.map((subnet, index) => `
+                                <tr>
+                                    <td>${index + 1}</td>
+                                    <td>${subnet.networkAddress}</td>
+                                    <td>${subnet.useableRange}</td>
+                                    <td>${subnet.broadcastAddress}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            resultDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
