@@ -295,17 +295,18 @@
 
             if (selectedOption === "byHosts") {
                 const numSubnets = subnetPerHostCount(Count, networkClass);
-                if (networkClass === 'C'){
-                    if (Count >254 || Count < 1){
-                        alert("Maxhost for this class of subnet!")
+                if (networkClass === 'C') {
+                    if (Count > 254 || Count < 1) {
+                        alert("Maxhost for this class of subnet!");
                     }
                 } else if (networkClass === 'B') {
-                    if (Count >65534 || Count <255) {
-                        alert("Maxhost for this class of subnet!") 
+                    if (Count > 65534 || Count < 255) {
+                        alert("Maxhost for this class of subnet!");
                     }
                 } else {
-                    if (Count >16777214 || Count < 65535)
-                        alert("Maxhost for this class of subnet!")
+                    if (Count > 16777214 || Count < 65535) {
+                        alert("Maxhost for this class of subnet!");
+                    }
                 }
                 if (numSubnets !== null) {
                     console.log("Number of Subnets: ", numSubnets);
@@ -328,7 +329,6 @@
                         subnets: subnets
                     });
                 }
-            
             } else if (selectedOption === "bySubnets") {
                 const hostcount = HostPerSubnet(Count, networkClass);
                 if (hostcount !== null) {
@@ -351,11 +351,8 @@
                         cidrLength: cidrLength,
                         subnets: subnets
                     });
-
                 }
             }
-
-
         }
         function display(data) {
             const resultDiv = document.getElementById('result');
